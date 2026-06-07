@@ -12,7 +12,7 @@ inputs:
     description: 'Ruleset file used to determine what checks are run.'
     default: 'NativeRecommendedRules.ruleset'
   ignoredPaths:
-    description: 'Identical to setting "ignoredTargetPaths" and "ignoreSystemHeaders" for the given path. This
+    description: 'Identical to setting "ignoredTargetPaths" and "ignoredIncludePaths" for the given path. This
                   is recommended over either option seperately.'
   ignoredTargetPaths:
     description: 'Any CMake targets defined inside these paths will be excluded from analysis. This is useful
