@@ -8645,9 +8645,20 @@ function isDirectoryEmpty(targetDir) {
  * @param {string} targetDir directory to test
  * @returns {boolean} true if a sub-directory is found
  */
+
+function normalizePathForCompare(pth) {
+  return path.normalize(pth).toLowerCase();
+}
+
 function containsSubdirectory(parentDirs, targetDir) {
-  const normalizedTarget = path.normalize(targetDir);
-  return parentDirs.some((parentDir) => normalizedTarget.startsWith(path.normalize(parentDir)));
+  const normalizedTarget = normalizePathForCompare(targetDir);
+
+  return parentDirs.some((parentDir) => {
+    const normalizedParent = normalizePathForCompare(parentDir);
+
+    return normalizedTarget === normalizedParent ||
+        normalizedTarget.startsWith(normalizedParent + path.sep);
+  });
 }
 
 /**
@@ -8669,6 +8680,12 @@ function getRelativeTo(fromPath, relativePath) {
 function resolvePath(unresolvedPath) {
   return path.normalize(path.isAbsolute(unresolvedPath) ? 
     unresolvedPath : path.join(process.env.GITHUB_WORKSPACE, unresolvedPath));
+}
+
+function resolveCMakePath(sourceRoot, cmakePath) {
+  return path.normalize(
+    path.isAbsolute(cmakePath) ? cmakePath : path.join(sourceRoot, cmakePath)
+  );
 }
 
 /**
@@ -8974,7 +8991,11 @@ function loadCompileCommands(replyIndexInfo, buildConfiguration, excludedTargetP
 
   const codemodelInfo = configurations[0];
   for (const targetInfo of codemodelInfo.targets) {
-    const targetDir = path.join(sourceRoot, codemodelInfo.directories[targetInfo.directoryIndex].source);
+    const targetDir = resolveCMakePath(
+        sourceRoot,
+        codemodelInfo.directories[targetInfo.directoryIndex].source
+    );
+
     if (containsSubdirectory(excludedTargetPaths, targetDir)) {
       continue;
     }
@@ -8982,7 +9003,18 @@ function loadCompileCommands(replyIndexInfo, buildConfiguration, excludedTargetP
     const target = parseReplyFile(path.join(replyDir, targetInfo.jsonFile));
     for (const group of target.compileGroups || []) {
       for (const sourceIndex of group.sourceIndexes) {
-        const source = path.join(sourceRoot, target.sources[sourceIndex].path);
+        const source = resolveCMakePath(
+          sourceRoot,
+          target.sources[sourceIndex].path
+        );
+  
+        // Also skip source files under excluded paths. This is needed because
+        // ignoredTargetPaths only checks the CMake target directory, which may
+        // not match the actual source-file directory.
+        if (containsSubdirectory(excludedTargetPaths, source)) {
+          continue;
+        }
+  
         compileCommands.push(new CompileCommand(group, source));
       }
     }
